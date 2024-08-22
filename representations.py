@@ -51,19 +51,121 @@ Evaluation:
             Test data 
 
 """
+import torch
+from torch import nn
+
+from torch.utils.data import Dataset
+from torch.utils.data import DataLoader
+from torchvision import datasets
+from torchvision.transforms import ToTensor
+
+import numpy as np
+
+from utils.manifold_analysis import *
+from utils.activation_extractor import *
+from utils.make_manifold_data import  *
+
 
 ########################################
 #                MODELS                #
 ########################################
 
+class SingleMLP(nn.Module):
 
+    def __init__(self, input_size, hidden_size = 10, output_size = 2):
 
+        # input_size  := length of the flattened input
+        # hidden_size := desired size of the embedded representation
+        # output_size := desired size of output -- building a classifier over the task
 
+        super(SingleMLP, self).__init__()        
+
+        self.learn = nn.Sequential(
+            nn.Linear(input_size, hidden_size),
+            nn.ReLU(), 
+            nn.Linear(hidden_size, output_size),
+            nn.Softmax()
+        )
+
+    def forward(self, x):
+        x = self.flatten(x)
+        logits = self.learn(x)
+        return logits
+
+class MultipleMLP(nn.Module):
+
+    def __init__(self, input_size, output_size = 2):
+
+        # input_size  := length of the flattened input
+        # output_size := desired size of output -- building a classifier over the task
+
+        super(MultipleMLP, self).__init__()        
+
+        self.learn = nn.Sequential(
+            nn.Linear(input_size, 256),
+            nn.ReLU(),
+            nn.Linear(256, 64),
+            nn.ReLU(),
+            nn.Linear(64, 16),
+            nn.ReLU(),
+            nn.Linear(16, output_size),
+            nn.Softmax()
+        )
+
+    def forward(self, x):
+        x = self.flatten(x)
+        logits = self.learn(x)
+        return logits
+
+class PaperModel(nn.Module):
+
+    def __init__(self):
+
+        super(PaperModel, self).__init__()        
+
+        pass ##!TODO: need to find implementation
+
+    def forward(self, x):
+        x = self.flatten(x)
+        logits = self.learn(x)
+        return logits
+    
 ########################################
 #               DATASETS               #
 ########################################
 
 
+# Simulated Gaussians
+
+
+# CSHL Simulated Data
+sampled_classes = 40
+examples_per_class = 40
+data = make_manifold_data(training_data,sampled_classes,examples_per_class)           # Given the data, the number of classes, and the number of examples per class, we get the data we want as input to the neural network
+data = [d for d in data]
+
+# MNIST data
+mnist_training_data = datasets.MNIST(
+    root="data",
+    train=True,
+    download=True,
+    transform=ToTensor()
+)
+
+mnist_test_data = datasets.MNIST(
+    root="data",
+    train=False,
+    download=True,
+    transform=ToTensor()
+)
+
+# generic dataloading function
+def load(training_data, test_data, data, batch_size = 64, shuffle = True):
+
+    train_dataloader = DataLoader(training_data, batch_size=64, shuffle=True)
+    test_dataloader = DataLoader(test_data, batch_size=64, shuffle=True)
+
+    return train_dataloader, test_dataloader
 
 
 ########################################
