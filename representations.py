@@ -12,6 +12,7 @@ Models:
 Experiments:
     Dataset
         Simulated data of two (or more) Gaussian distributions
+        There's a theoretical dataset creater in the 2022 CSHL utils folder
         Vectorized MNIST data
         NeuroGym tasks?
 
@@ -25,6 +26,8 @@ Evaluation:
             Let the set of all inputs with label y_i be Z_i = {z_{i_1}, z_{i_2}, ..., z_{i_k}}.
             Let the set of all embeddings corresponding to inputs Z_i be X_i,
                 where x_{i_{j}} = f(w_MLP, z_{i_{j}}), 1 <= j <= k
+                
+            Hidden representations can be extracted using activation_extractor.py from the 2022 CSHL utils folder
 
         For each y_i, create a matrix M_i, where the columns of M_i are made of the elements of X_i
         CSHL-2022 github code takes in a python list of all matrices M_i and spits out the capacity
