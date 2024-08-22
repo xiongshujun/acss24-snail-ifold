@@ -57,6 +57,7 @@ from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 from torchvision import datasets
 from torchvision.transforms import ToTensor
+from torch.optim import SGD
 
 import numpy as np
 import random
@@ -168,10 +169,10 @@ mnist_test_data = datasets.MNIST(
 )
 
 # generic dataloading function
-def load(training_data, test_data, data, batch_size = 64, shuffle = True):
+def load(training_data, test_data, batch_size = 64, shuffle = True):
 
-    train_dataloader = DataLoader(training_data, batch_size=64, shuffle=True)
-    test_dataloader = DataLoader(test_data, batch_size=64, shuffle=True)
+    train_dataloader = DataLoader(training_data, batch_size, shuffle)
+    test_dataloader = DataLoader(test_data, batch_size, shuffle)
 
     return train_dataloader, test_dataloader
 
@@ -187,13 +188,31 @@ def load_mfld(raw_data, sampled_classes = 40, examples_per_class = 40):
 ########################################
 
 # Code adapted from CSHL 2022 codebase
-def capacity(model, raw_data, kappa = 0, n_t = 300):
+def get_capacity(model, data, epoch, kappa = 0, n_t = 300):
 
-    # One thing to note is that the CSHL 2022 code evaluates activations on training data.
-        # This function refactors this to accept data (train, evaluation, or test) more generally
+    """
+    One thing to note is that the CSHL 2022 code evaluates activations on training data. 
+        This function refactors this to accept data (train or test) more generally
+    
+    The CSHL 2022 implementation gets snapshots of what the capacity metrics look like
+        In the training loop, we will get a collection of the values at each layer over a given model and build their respective functions over time
+    
+    INPUT
+        model := the model we are evaluating
+        data  := the dataset over which this model will be evaluated
+        epoch := the timepoint in training in which this model will be evaluated
+        kappa := margin of capacity
+        n_t   := number of Gaussian vectors to sample over
 
-    data = load_mfld(raw_data)
+    OUTPUT
+        layers := list of strs
+            layers[i] := name of the i'th layer
+        capacities:= a list of lists
+            capacities[i] := [epoch, capacity, radius, dimension] for the i'th layer of activations
+    """    
+
     activations_dict = extractor(model, data, layer_nums=model.get_layers()) # variability in number of layers per model
+
 
     # Reshape the manifold data to the expected dimensions
     for layer, activations in activations_dict.items():
@@ -201,17 +220,140 @@ def capacity(model, raw_data, kappa = 0, n_t = 300):
         activations_dict[layer] = X
     
     # get the relevant variables more generally
+    capacities = []
+    layers = []
     for layer, activations in activations_dict.items():
-        alpha, radius, dimension = manifold_analysis(X,kappa,n_t)
+        alpha, radius, dimension = manifold_analysis(X, kappa, n_t)
         c = 1/np.mean(1/alpha)
         r = np.mean(radius)
         d = np.mean(dimension)
+        
+        """
         print(f"{layer}, Capacity: {c}, Radius: {r}, Dimension: {d}")
 
-def eval():
+        This print would return something like
 
+        layer_0_Input, Capacity: 0.10210382868414464, Radius: 1.165534398073706, Dimension: 16.234330064336838
+
+        or
+
+        layer_3_ReLU, Capacity: 0. 10214180034859942, Radius: 1.1709662436924018, Dimension: 16.25642020167163
+        """
+
+        capacities.append([epoch, c, r, d])
+        layers.append[f"{layer}"]
+
+    return layers, capacities
 
 ########################################
 #              EXPERIMENT              #
 ########################################
+# Define hyparameters, loss function, and optimizer
 
+lr = 0.01            # learning rate
+epochs = 100          # training time
+batch_size = 64      
+
+def train(model, training_data, test_data, loss_fn = nn.CrossEntropyLoss()):
+
+    """
+    INPUT
+
+    OUTPUT
+        losses := list of 2-element lists, tracking loss over time
+            losses[t] := loss at epoch t
+        capacities_over_time := dict of dicts
+            capacities_over_time['train_capacity_outputs'] := dict where the keys are a layer and the values form a list of [t, c(t)] pairs 
+                                                                representing the capacity of the layer representations of training data over time
+            capacities_over_time['train_radius_outputs'] := dict where the keys are a layer and the values form a list of [t, r(t)] pairs 
+                                                                representing the radius of the layer representations of training data over time
+            capacities_over_time['train_dimension_outputs'] := dict where the keys are a layer and the values form a list of [t, d(t)] pairs 
+                                                                representing the dimension of the layer representations of training data over time
+    
+            capacities_over_time['test_capacity_outputs'] := dict where the keys are a layer and the values form a list of [t, c(t)] pairs 
+                                                                representing the capacity of the layer representations of test data over time
+            capacities_over_time['test_radius_outputs'] := dict where the keys are a layer and the values form a list of [t, r(t)] pairs 
+                                                                representing the radius of the layer representations of test data over time
+            capacities_over_time['test_dimension_outputs'] := dict where the keys are a layer and the values form a list of [t, d(t)] pairs 
+                                                                representing the dimension of the layer representations of test data over time
+    """
+
+    optimizer = SGD(model.parameters(), lr)
+    training_dataloader, test_dataloader = load(training_data, test_data)
+    mfld_training_data = load_mfld(training_data)
+    mfld_testing_data  = load_mfld(test_data)
+
+    losses = []
+    
+    # training loop
+    t = 0
+    for X, Y in training_dataloader:
+
+        # prediction and loss
+        pred = model(X)
+        loss = loss_fn(pred, Y)
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        # evaluation
+        losses.append([t, loss])
+        print(f"Epoch: {t}, Loss: {loss:4f}")
+
+        # get the capacity of each layer at this time point
+            #!RECALL: capacities[i] := [epoch, capacity, radius, dimension] for the i'th layer of activations
+        train_layers, train_capacities = get_capacity(model = model, data = mfld_training_data, epoch = t)
+        test_layers, test_capacities   = get_capacity(model = model, data = mfld_testing_data, epoch = t)
+
+        if t == 0: # case where we haven't set up the trackers of capacity
+            train_capacity_outputs  = {}
+            train_radius_outputs    = {}
+            train_dimension_outputs = {}
+            
+            test_capacity_outputs  = {}
+            test_radius_outputs    = {}
+            test_dimension_outputs = {}
+                # t_capacity_output[i] = [[t, c_i(t)]]
+                # t_radius_output[i] = [[t, r_i(t)]]
+                # t_dimension_output[i] = [[t, d_i(t)]]
+
+            for i in range(len(train_capacities)):
+                train_capacity_outputs[train_layers[i]]  = [[train_capacities[0], train_capacities[1]]]
+                train_radius_outputs[train_layers[i]]    = [[train_capacities[0], train_capacities[2]]]
+                train_dimension_outputs[train_layers[i]] = [[train_capacities[0], train_capacities[3]]]
+                
+                test_capacity_outputs[test_layers[i]]  = [[test_capacities[0], test_capacities[1]]]
+                test_radius_outputs[test_layers[i]]    = [[test_capacities[0], test_capacities[2]]]
+                test_dimension_outputs[test_layers[i]] = [[test_capacities[0], test_capacities[3]]]
+
+        else:
+            for i in range(len(train_capacities)):
+                train_capacity_outputs[train_layers[i]].append([[train_capacities[0], train_capacities[1]]])
+                train_radius_outputs[train_layers[i]].append([[train_capacities[0], train_capacities[2]]])
+                train_dimension_outputs[train_layers[i]].append([[train_capacities[0], train_capacities[3]]])
+                
+                test_capacity_outputs[test_layers[i]].append([[test_capacities[0], test_capacities[1]]])
+                test_radius_outputs[test_layers[i]].append([[test_capacities[0], test_capacities[2]]])
+                test_dimension_outputs[test_layers[i]].append([[test_capacities[0], test_capacities[3]]])
+        
+        t += 1
+
+    capacities_over_time = {
+        'train_capacity_outputs': train_capacity_outputs,
+        'train_radius_outputs' : train_radius_outputs,
+    }
+    
+
+# Testing step
+def testing_step(dataloader,model,loss_fn):
+    correct = 0
+    for X, Y in dataloader:
+        pred = model(X)
+        correct += (pred.argmax(1) == Y).type(torch.float).sum().item()
+    return correct
+
+correct = testing_step(test_dataloader,my_model,loss_fn)
+size = len(test_dataloader.dataset)
+correct /= size
+print(f"Test Error: \n Accuracy: {(100*correct):>0.1f}% \n")
