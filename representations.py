@@ -6,7 +6,7 @@ We make the argument that this improves over time during training as well
 
 Stephenson and Padhy et al (2021) gives us four snapshots comparing manifold capacity demonstrating maximal capacity during generalization
     and associated phenomena (e.g. double descent, comparisons with loss over time), but still doesn't give us capacity and radii of mflds over time
-We aim to show that this is the case as well
+We aim to show that this is the case as well. This paper also adds noise by randomly permuting labels, but we will also add noise within the input space itself (more input statistics, likely will increase the radii)
 
 Lastly, we aim to look at capacity in cognitive tasks (simulated in NeuroGym) and, as a long shot, verification in vivo
 
@@ -37,7 +37,8 @@ Evaluation:
 
         For each y_i, create a matrix M_i, where the columns of M_i are made of the elements of X_i
         CSHL-2022 github code takes in a python list of all matrices M_i and spits out the capacity
-
+            This function gets manifold_geometry.manifold_analysis import manifold_analysis
+        
         Let c(t) be the function of capacity over training epoch t
         We are interested in the behavior of c(t) with respect to more classical metrics in machine learning (e.g. MSE loss)
 
