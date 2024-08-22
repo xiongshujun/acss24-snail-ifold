@@ -18,7 +18,6 @@ Models:
 Experiments:
     Dataset
         Simulated data of two (or more) Gaussian distributions
-        There's a theoretical dataset creater in the 2022 CSHL utils folder
         Vectorized MNIST data
         NeuroGym tasks?
 
@@ -60,6 +59,7 @@ from torchvision import datasets
 from torchvision.transforms import ToTensor
 
 import numpy as np
+import random
 
 from utils.manifold_analysis import *
 from utils.activation_extractor import *
@@ -91,6 +91,9 @@ class SingleMLP(nn.Module):
         x = self.flatten(x)
         logits = self.learn(x)
         return logits
+    
+    def get_layers(self):
+        return 2
 
 class MultipleMLP(nn.Module):
 
@@ -116,6 +119,9 @@ class MultipleMLP(nn.Module):
         x = self.flatten(x)
         logits = self.learn(x)
         return logits
+    
+    def get_layers(self):
+        return 4
 
 class PaperModel(nn.Module):
 
@@ -134,15 +140,17 @@ class PaperModel(nn.Module):
 #               DATASETS               #
 ########################################
 
+#!TODO: Simulated Gaussians
+"""vector_size = 28*28 # same as MNIST
+num_samples = 1000
+class_num   = 2 # maximum number of classes
+                    # for each class we draw a sample from a different Gaussian distribution 
 
-# Simulated Gaussians
-
-
-# CSHL Simulated Data
-sampled_classes = 40
-examples_per_class = 40
-data = make_manifold_data(training_data,sampled_classes,examples_per_class)           # Given the data, the number of classes, and the number of examples per class, we get the data we want as input to the neural network
-data = [d for d in data]
+data = []
+for i in range(num_samples):
+    data.append([])
+# create Gaussians
+random.randint(0, class_num - 1)"""
 
 # MNIST data
 mnist_training_data = datasets.MNIST(
@@ -167,12 +175,40 @@ def load(training_data, test_data, data, batch_size = 64, shuffle = True):
 
     return train_dataloader, test_dataloader
 
+# manifold data simulation
+def load_mfld(raw_data, sampled_classes = 40, examples_per_class = 40):
+    data = make_manifold_data(raw_data, sampled_classes,examples_per_class) # Given the data, the number of classes, and the number of examples per class, we get the data we want as input to the neural network
+    data = [d for d in data]
+    return data
 
 ########################################
 #              EVALUATION              #
 #               FUNCTION               #
 ########################################
 
+# Code adapted from CSHL 2022 codebase
+def capacity(model, raw_data, kappa = 0, n_t = 300):
+
+    # One thing to note is that the CSHL 2022 code evaluates activations on training data.
+        # This function refactors this to accept data (train, evaluation, or test) more generally
+
+    data = load_mfld(raw_data)
+    activations_dict = extractor(model, data, layer_nums=model.get_layers()) # variability in number of layers per model
+
+    # Reshape the manifold data to the expected dimensions
+    for layer, activations in activations_dict.items():
+        X = [d.reshape(d.shape[0],-1).T for d in activations]
+        activations_dict[layer] = X
+    
+    # get the relevant variables more generally
+    for layer, activations in activations_dict.items():
+        alpha, radius, dimension = manifold_analysis(X,kappa,n_t)
+        c = 1/np.mean(1/alpha)
+        r = np.mean(radius)
+        d = np.mean(dimension)
+        print(f"{layer}, Capacity: {c}, Radius: {r}, Dimension: {d}")
+
+def eval():
 
 
 ########################################
