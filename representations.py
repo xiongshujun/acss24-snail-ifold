@@ -4,6 +4,12 @@ REPRESENTATION CAPACITY OF MLP OVER TRAINING TIME
 Cohen et al (2020) shows that manifold separability improves as the depth of the network increases.
 We make the argument that this improves over time during training as well
 
+Stephenson and Padhy et al (2021) gives us four snapshots comparing manifold capacity demonstrating maximal capacity during generalization
+    and associated phenomena (e.g. double descent, comparisons with loss over time), but still doesn't give us capacity and radii of mflds over time
+We aim to show that this is the case as well
+
+Lastly, we aim to look at capacity in cognitive tasks (simulated in NeuroGym) and, as a long shot, verification in vivo
+
 Models:
     Linear 1-layer MLP with classifier on embedding (output of MLP)
     Multilayer MLP with classifier at the end of the MLP
