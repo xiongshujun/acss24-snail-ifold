@@ -3,9 +3,7 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 
-def unpickle(file_name, dir = 'representations_data\\'):
-    with open(dir + file_name + '.pickle', 'rb') as f:
-        return pickle.load(f)
+from utils.pickling import *
 
 ########################################
 #               PLOTTING               #
@@ -36,7 +34,6 @@ def unpickle(file_name, dir = 'representations_data\\'):
 
 # Unpickle the data
 losses = unpickle('training_loss_over_time_082324_1')
-correct = unpickle('correct_082324_1')
 capacities_over_time = unpickle('capacities_over_time_082324_1')
 
 parameters = list(capacities_over_time.keys()) # Get each of the 6 parameters we're looking at
@@ -55,19 +52,6 @@ ax.set(xlabel = 'Epoch', ylabel = 'Loss',
 
 fig.savefig(fig_dir + 'trainingloss_082324_1.png')
 plt.show()
-
-#!HOTFIX FOR DATA COLLECTION BUG
-    # The data collection bug has been fixed for all trained models in the future
-    # This codeblock is for any model trained prior to 9:15AM Aug 28 2024
-    #!TODO: pickle the results from this codeblock into older data so this won't be needed
-for param in parameters:
-    for layer in layers:
-        d = capacities_over_time[param][layer]
-
-        for i in range(1, len(d)):
-            d[i] = d[i][0]
-
-        capacities_over_time[param][layer] = d
 
 # Loop over each set of parameters and each combination of layers
 # capacities_over_time[param][layer] := list of (t, f(t)) where f(t) is the parameter we're looking at with respect to time at the given layer

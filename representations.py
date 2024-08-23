@@ -67,10 +67,7 @@ import time
 from utils.manifold_analysis import *
 from utils.activation_extractor import *
 from utils.make_manifold_data import  *
-
-def data_pickle(data, file_name, dir = 'representations_data\\'):
-    with open(dir + file_name + '.pickle', 'wb') as f:
-        pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
+from utils.pickling import *
 
 ########################################
 #                MODELS                #
