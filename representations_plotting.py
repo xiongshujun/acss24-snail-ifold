@@ -42,7 +42,7 @@ layers     = list(capacities_over_time[parameters[0]].keys()) # Get the layer na
 fig_dir = 'figures\\'
 suffix  = '082324_1.png'
 
-# Losses
+"""# Losses
 losses = np.array(losses).T
 fig, ax = plt.subplots()
 ax.plot(losses[0], losses[1])
@@ -62,8 +62,66 @@ for param in parameters:
         fig, ax = plt.subplots()
         ax.plot(data[0], data[1])
 
-        ax.set(xlabel = 'Epoch', ylabel = param,
-            title = param + ' in ' + layer + ' with respect to Time')
+        param_str = param[:-8]
 
-        fig.savefig(fig_dir + param + '_' + layer + '_' + suffix)
+        ax.set(xlabel = 'Epoch', ylabel = param_str,
+            title = param_str + ' in ' + layer + ' with respect to Time')
+
+        fig.savefig(fig_dir + param_str + '_' + layer + '_' + suffix)
         plt.show()
+
+# Plot all pairs of [same layer - train/test] on the same graphs
+# Since there are 3 metrics, all i with the same value modulo 3 contain the same parameters
+for layer in layers:
+    for j in range(3):
+        fig, ax = plt.subplots()
+
+        param = parameters[j]
+        param_str = param[param.find('_') + 1: -8]
+
+        for i in range(len(parameters)):            
+            if i % 3 == j:
+
+                param = parameters[i]
+                condition = param[:param.find('_')]
+
+                data = np.array(capacities_over_time[param][layer]).T
+                ax.plot(data[0], data[1], label = condition)
+        
+        ax.set(xlabel = 'Epoch', ylabel = param_str,
+            title = param_str + ' in ' + layer + ' with respect to Time')
+        plt.legend(title='Setting:')
+
+        fig.savefig(fig_dir + param_str + '_' + layer + '_' + suffix)
+        plt.show()"""
+
+# Plot all pairs of [same metric - different layers] on the same graph
+for j in range(3):
+    fig, ax = plt.subplots()
+
+    param = parameters[j]
+    param_str = param[param.find('_') + 1: -8] + ' Across Layers'
+
+    for i in range(len(parameters)):            
+        if i % 3 == j:
+
+            param = parameters[i]
+            condition = param[:param.find('_')]
+
+            for layer in layers:
+
+                data = np.array(capacities_over_time[param][layer]).T
+                condition = param[:param.find('_')] + '_' + layer
+                ax.plot(data[0], data[1], label = condition)
+
+    ax.set(xlabel = 'Epoch', ylabel = param_str,
+            title = param_str + ' with respect to Time')
+    plt.legend(title='Setting:')
+
+    fig.savefig(fig_dir + param_str + '_' + suffix)
+    plt.show()
+
+# Plot all the training stuff on the same graph
+
+
+# Plot all the testing stuff on the same graph
