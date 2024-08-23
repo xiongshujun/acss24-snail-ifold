@@ -42,7 +42,7 @@ layers     = list(capacities_over_time[parameters[0]].keys()) # Get the layer na
 fig_dir = 'figures\\'
 suffix  = '082324_1.png'
 
-"""# Losses
+# Losses
 losses = np.array(losses).T
 fig, ax = plt.subplots()
 ax.plot(losses[0], losses[1])
@@ -93,7 +93,7 @@ for layer in layers:
         plt.legend(title='Setting:')
 
         fig.savefig(fig_dir + param_str + '_' + layer + '_' + suffix)
-        plt.show()"""
+        plt.show()
 
 # Plot all pairs of [same metric - different layers] on the same graph
 for j in range(3):
