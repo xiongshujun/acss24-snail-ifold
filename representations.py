@@ -385,6 +385,11 @@ model = SingleMLP()
 losses, correct, capacities_over_time = eval(model, training_data = mnist_training_data, test_data = mnist_test_data)
 
 now = time.strftime('%d_%m_%Y-%H_%M_%S')
+if model is SingleMLP:
+    data_pickle(model, 'SingleMLP_' + now)
+elif model is MultipleMLP:
+    data_pickle(model, 'MultipleMLP_' + now)
+    
 data_pickle(losses, 'training_loss_over_time_' + now)
 data_pickle(correct, 'correct_' + now)
 data_pickle(capacities_over_time, 'capacities_over_time_' + now)
