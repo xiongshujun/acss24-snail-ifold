@@ -60,12 +60,17 @@ from torchvision.transforms import ToTensor
 from torch.optim import SGD
 
 import numpy as np
-import random
+import pickle
+
+import time
 
 from utils.manifold_analysis import *
 from utils.activation_extractor import *
 from utils.make_manifold_data import  *
 
+def data_pickle(data, file_name, dir = 'representations_data\\'):
+    with open(dir + file_name + '.pickle', 'wb') as f:
+        pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
 
 ########################################
 #                MODELS                #
@@ -73,13 +78,15 @@ from utils.make_manifold_data import  *
 
 class SingleMLP(nn.Module):
 
-    def __init__(self, input_size, hidden_size = 10, output_size = 2):
+    def __init__(self, input_size = 784, hidden_size = 100, output_size = 10):
 
         # input_size  := length of the flattened input
         # hidden_size := desired size of the embedded representation
         # output_size := desired size of output -- building a classifier over the task
 
-        super(SingleMLP, self).__init__()        
+        super(SingleMLP, self).__init__()   
+
+        self.flatten = nn.Flatten()     
 
         self.learn = nn.Sequential(
             nn.Linear(input_size, hidden_size),
@@ -103,7 +110,9 @@ class MultipleMLP(nn.Module):
         # input_size  := length of the flattened input
         # output_size := desired size of output -- building a classifier over the task
 
-        super(MultipleMLP, self).__init__()        
+        super(MultipleMLP, self).__init__()      
+
+        self.flatten = nn.Flatten()  
 
         self.learn = nn.Sequential(
             nn.Linear(input_size, 256),
@@ -177,8 +186,8 @@ def load(training_data, test_data, batch_size = 64, shuffle = True):
     return train_dataloader, test_dataloader
 
 # manifold data simulation
-def load_mfld(raw_data, sampled_classes = 40, examples_per_class = 40):
-    data = make_manifold_data(raw_data, sampled_classes,examples_per_class) # Given the data, the number of classes, and the number of examples per class, we get the data we want as input to the neural network
+def load_mfld(raw_data, sampled_classes = 10, examples_per_class = 40):
+    data = make_manifold_data(raw_data, sampled_classes, examples_per_class) # Given the data, the number of classes, and the number of examples per class, we get the data we want as input to the neural network
     data = [d for d in data]
     return data
 
@@ -211,7 +220,7 @@ def get_capacity(model, data, epoch, kappa = 0, n_t = 300):
             capacities[i] := [epoch, capacity, radius, dimension] for the i'th layer of activations
     """    
 
-    activations_dict = extractor(model, data, layer_nums=model.get_layers()) # variability in number of layers per model
+    activations_dict = extractor(model, data, layer_nums=[model.get_layers()]) # variability in number of layers per model
 
 
     # Reshape the manifold data to the expected dimensions
@@ -241,7 +250,7 @@ def get_capacity(model, data, epoch, kappa = 0, n_t = 300):
         """
 
         capacities.append([epoch, c, r, d])
-        layers.append[f"{layer}"]
+        layers.append(layer)
 
     return layers, capacities
 
@@ -251,10 +260,10 @@ def get_capacity(model, data, epoch, kappa = 0, n_t = 300):
 # Define hyparameters, loss function, and optimizer
 
 lr = 0.01            # learning rate
-epochs = 100          # training time
+epochs = 20          # training time
 batch_size = 64      
 
-def train(model, training_data, test_data, loss_fn = nn.CrossEntropyLoss()):
+def eval(model, training_data, test_data, loss_fn = nn.CrossEntropyLoss()):
 
     """
     INPUT
@@ -262,6 +271,9 @@ def train(model, training_data, test_data, loss_fn = nn.CrossEntropyLoss()):
     OUTPUT
         losses := list of 2-element lists, tracking loss over time
             losses[t] := loss at epoch t
+
+        correct := float, test accuracy
+
         capacities_over_time := dict of dicts
             capacities_over_time['train_capacity_outputs'] := dict where the keys are a layer and the values form a list of [t, c(t)] pairs 
                                                                 representing the capacity of the layer representations of training data over time
@@ -285,20 +297,26 @@ def train(model, training_data, test_data, loss_fn = nn.CrossEntropyLoss()):
 
     losses = []
     
-    # training loop
+    # TRAINING
     t = 0
-    for X, Y in training_dataloader:
+    while t < epochs:
 
-        # prediction and loss
-        pred = model(X)
-        loss = loss_fn(pred, Y)
+        l = 0 # keep track of total loss over an epoch
+        for X, Y in training_dataloader:
 
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+            # prediction and loss
+            pred = model(X)
+            loss = loss_fn(pred, Y)
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            l += loss
 
         # evaluation
-        losses.append([t, loss])
+        l = l.detach().item()
+        losses.append([t, l/len(X)])
         print(f"Epoch: {t}, Loss: {loss:4f}")
 
         # get the capacity of each layer at this time point
@@ -319,41 +337,54 @@ def train(model, training_data, test_data, loss_fn = nn.CrossEntropyLoss()):
                 # t_dimension_output[i] = [[t, d_i(t)]]
 
             for i in range(len(train_capacities)):
-                train_capacity_outputs[train_layers[i]]  = [[train_capacities[0], train_capacities[1]]]
-                train_radius_outputs[train_layers[i]]    = [[train_capacities[0], train_capacities[2]]]
-                train_dimension_outputs[train_layers[i]] = [[train_capacities[0], train_capacities[3]]]
+                train_capacity_outputs[train_layers[i]]  = [[train_capacities[i][0], train_capacities[i][1]]]
+                train_radius_outputs[train_layers[i]]    = [[train_capacities[i][0], train_capacities[i][2]]]
+                train_dimension_outputs[train_layers[i]] = [[train_capacities[i][0], train_capacities[i][3]]]
                 
-                test_capacity_outputs[test_layers[i]]  = [[test_capacities[0], test_capacities[1]]]
-                test_radius_outputs[test_layers[i]]    = [[test_capacities[0], test_capacities[2]]]
-                test_dimension_outputs[test_layers[i]] = [[test_capacities[0], test_capacities[3]]]
+                test_capacity_outputs[test_layers[i]]  = [[test_capacities[i][0], test_capacities[i][1]]]
+                test_radius_outputs[test_layers[i]]    = [[test_capacities[i][0], test_capacities[i][2]]]
+                test_dimension_outputs[test_layers[i]] = [[test_capacities[i][0], test_capacities[i][3]]]
 
         else:
             for i in range(len(train_capacities)):
-                train_capacity_outputs[train_layers[i]].append([[train_capacities[0], train_capacities[1]]])
-                train_radius_outputs[train_layers[i]].append([[train_capacities[0], train_capacities[2]]])
-                train_dimension_outputs[train_layers[i]].append([[train_capacities[0], train_capacities[3]]])
+                train_capacity_outputs[train_layers[i]].append([[train_capacities[i][0], train_capacities[i][1]]])
+                train_radius_outputs[train_layers[i]].append([[train_capacities[i][0], train_capacities[i][2]]])
+                train_dimension_outputs[train_layers[i]].append([[train_capacities[i][0], train_capacities[i][3]]])
                 
-                test_capacity_outputs[test_layers[i]].append([[test_capacities[0], test_capacities[1]]])
-                test_radius_outputs[test_layers[i]].append([[test_capacities[0], test_capacities[2]]])
-                test_dimension_outputs[test_layers[i]].append([[test_capacities[0], test_capacities[3]]])
+                test_capacity_outputs[test_layers[i]].append([[test_capacities[i][0], test_capacities[i][1]]])
+                test_radius_outputs[test_layers[i]].append([[test_capacities[i][0], test_capacities[i][2]]])
+                test_dimension_outputs[test_layers[i]].append([[test_capacities[i][0], test_capacities[i][3]]])
         
         t += 1
 
     capacities_over_time = {
         'train_capacity_outputs': train_capacity_outputs,
         'train_radius_outputs' : train_radius_outputs,
-    }
-    
+        'train_dimension_outputs' : train_dimension_outputs,
 
-# Testing step
-def testing_step(dataloader,model,loss_fn):
+        'test_capacity_outputs' : test_capacity_outputs,
+        'test_radius_outputs' : test_radius_outputs,
+        'test_dimension_outputs' : test_dimension_outputs
+    }
+
+    # TESTING
     correct = 0
-    for X, Y in dataloader:
+    for X, Y in test_dataloader:
         pred = model(X)
         correct += (pred.argmax(1) == Y).type(torch.float).sum().item()
-    return correct
+    
+    correct /= len(test_dataloader.dataset)
+    print(f"Test Error: \n Accuracy: {(100*correct):>0.1f}% \n")
 
-correct = testing_step(test_dataloader,my_model,loss_fn)
-size = len(test_dataloader.dataset)
-correct /= size
-print(f"Test Error: \n Accuracy: {(100*correct):>0.1f}% \n")
+    return losses, correct, capacities_over_time
+    
+########################################
+#                SAVING                #
+########################################
+model = SingleMLP()
+losses, correct, capacities_over_time = eval(model, training_data = mnist_training_data, test_data = mnist_test_data)
+
+now = time.strftime('%d_%m_%Y-%H_%M_%S')
+data_pickle(losses, 'losses_over_time_' + now)
+data_pickle(correct, 'correct_' + now)
+data_pickle(capacities_over_time, 'capacities_over_time_' + now)
