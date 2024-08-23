@@ -347,13 +347,13 @@ def eval(model, training_data, test_data, loss_fn = nn.CrossEntropyLoss()):
 
         else:
             for i in range(len(train_capacities)):
-                train_capacity_outputs[train_layers[i]].append([[train_capacities[i][0], train_capacities[i][1]]])
-                train_radius_outputs[train_layers[i]].append([[train_capacities[i][0], train_capacities[i][2]]])
-                train_dimension_outputs[train_layers[i]].append([[train_capacities[i][0], train_capacities[i][3]]])
+                train_capacity_outputs[train_layers[i]].append([train_capacities[i][0], train_capacities[i][1]])
+                train_radius_outputs[train_layers[i]].append([train_capacities[i][0], train_capacities[i][2]])
+                train_dimension_outputs[train_layers[i]].append([train_capacities[i][0], train_capacities[i][3]])
                 
-                test_capacity_outputs[test_layers[i]].append([[test_capacities[i][0], test_capacities[i][1]]])
-                test_radius_outputs[test_layers[i]].append([[test_capacities[i][0], test_capacities[i][2]]])
-                test_dimension_outputs[test_layers[i]].append([[test_capacities[i][0], test_capacities[i][3]]])
+                test_capacity_outputs[test_layers[i]].append([test_capacities[i][0], test_capacities[i][1]])
+                test_radius_outputs[test_layers[i]].append([test_capacities[i][0], test_capacities[i][2]])
+                test_dimension_outputs[test_layers[i]].append([test_capacities[i][0], test_capacities[i][3]])
         
         t += 1
 
@@ -385,6 +385,6 @@ model = SingleMLP()
 losses, correct, capacities_over_time = eval(model, training_data = mnist_training_data, test_data = mnist_test_data)
 
 now = time.strftime('%d_%m_%Y-%H_%M_%S')
-data_pickle(losses, 'losses_over_time_' + now)
+data_pickle(losses, 'training_loss_over_time_' + now)
 data_pickle(correct, 'correct_' + now)
 data_pickle(capacities_over_time, 'capacities_over_time_' + now)
